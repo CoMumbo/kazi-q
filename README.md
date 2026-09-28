@@ -35,20 +35,7 @@ Worker side:
 
 ## Architecture
 
-```
-   Producer (HTTP)                Worker process
-        |                              |
-        v                              v
-   +-----------+                +--------------+
-   | Flask API |                |  Poll loop   |
-   | :8000     |                |              |
-   +-----+-----+                +------+-------+
-         |                             |
-         |     +---------------+       |
-         +---->|   SQLite      |<------+
-               |  jobs table   |
-               +---------------+
-```
+![Architecture diagram](docs/architecture.png)
 
 The API and worker are separate processes. They communicate only through
 the `jobs` table. The worker can be scaled horizontally by running more
@@ -77,14 +64,38 @@ When a job's handler raises, the worker:
 Default backoff is exponential with `base=2.0`, so retries happen at
 2s, 4s, 8s, etc. All three settings are configurable in `.env`.
 
-## Getting started
+## Try the demo first
+
+The fastest way to see the whole system work:
 
 ```bash
 python -m venv .venv
 source .venv/Scripts/activate    # Windows Git Bash
 # or: source .venv/bin/activate  # macOS / Linux
 pip install -r requirements.txt
+
+python -m scripts.demo
 ```
+
+The demo runs the API and worker in-process, enqueues three jobs (`echo`,
+`sleep`, `fail`), and prints the final state. It exits in about 20 seconds.
+
+Expected output:
+
+```
+[4/5] final stats:
+      pending    0
+      running    0
+      succeeded  2
+      dead       1
+      total      3
+
+      dead-letter jobs:
+      a92299fe279b  type=fail  attempts=3
+        last_error: RuntimeError: demonstration failure
+```
+
+## Running it manually
 
 Start the API in one terminal:
 
@@ -97,8 +108,6 @@ Start a worker in another:
 ```bash
 python -m app.worker
 ```
-
-## Try it
 
 Enqueue a job that will succeed:
 
@@ -171,8 +180,11 @@ kazi-q/
 │   ├── models.py      SQLAlchemy Job model and JobState enum
 │   ├── db.py          engine and session setup
 │   └── config.py      env-based settings
+├── scripts/
+│   └── demo.py        end-to-end demo
 ├── tests/
 ├── docs/
+│   └── architecture.png
 └── requirements.txt
 ```
 
