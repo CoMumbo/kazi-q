@@ -188,6 +188,20 @@ kazi-q/
 └── requirements.txt
 ```
 
+## Design notes
+
+Two documents cover the *why* behind kazi-q:
+
+- [`docs/DESIGN.md`](docs/DESIGN.md) — storage, atomic claiming, retry
+  strategy, backoff math, process model, timezone handling, and what was
+  deliberately left out.
+- [`docs/FAILURES.md`](docs/FAILURES.md) — how the system behaves when
+  things go wrong: worker crashes, poison jobs, backlog growth, SQLite
+  write contention, and known gaps.
+
+If you're reading this to evaluate the project, those two documents are
+worth more than the code.
+
 ## License
 
 MIT
