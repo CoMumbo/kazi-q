@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 
 from app.db import get_session
 from app.models import Job, JobState
@@ -66,6 +66,56 @@ def list_dead(limit: int = 100) -> list[Job]:
             .limit(limit)
         ).scalars().all()
         return list(rows)
+
+
+def list_jobs(state: str | None = None, job_type: str | None = None, limit: int = 100) -> list[Job]:
+    """List jobs with optional filters, most recent first.
+
+    `state` should be a JobState value (e.g. "pending"), or None for all.
+    `job_type` filters by the type field, or None for all.
+    """
+    with get_session() as session:
+        stmt = select(Job)
+        if state is not None:
+            stmt = stmt.where(Job.state == JobState(state))
+        if job_type is not None:
+            stmt = stmt.where(Job.type == job_type)
+        stmt = stmt.order_by(Job.created_at.desc()).limit(limit)
+        rows = session.execute(stmt).scalars().all()
+        return list(rows)
+
+
+def retry(job_id: str) -> Job | None:
+    """Reset a job to pending so a worker will pick it up again.
+
+    Only meaningful for dead or failed jobs. Returns the updated job, or
+    None if the job doesn't exist.
+    """
+    with get_session() as session:
+        job = session.get(Job, job_id)
+        if job is None:
+            return None
+        job.state = JobState.PENDING
+        job.attempts = 0
+        job.next_run_at = _utcnow()
+        job.last_error = None
+        job.updated_at = _utcnow()
+        session.commit()
+        session.refresh(job)
+        log.info("retried job %s", job.id)
+        return job
+
+
+def delete(job_id: str) -> bool:
+    """Delete a job. Returns True if it existed and was deleted."""
+    with get_session() as session:
+        job = session.get(Job, job_id)
+        if job is None:
+            return False
+        session.delete(job)
+        session.commit()
+        log.info("deleted job %s", job_id)
+        return True
 
 
 def to_dict(job: Job) -> dict:
